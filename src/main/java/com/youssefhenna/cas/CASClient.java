@@ -1,12 +1,11 @@
 package com.youssefhenna.cas;
 
-import com.youssefhenna.cas.model.ReadSessionResponse;
 
 import java.io.IOException;
 
 public interface CASClient {
 
-    ReadSessionResponse readSession(String name) throws IOException, InterruptedException, CASClientException;
+    String readSession(String name) throws IOException, InterruptedException, CASClientException;
 
 
     class CASClientException extends Exception {
