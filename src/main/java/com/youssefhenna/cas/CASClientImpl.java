@@ -2,6 +2,8 @@ package com.youssefhenna.cas;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youssefhenna.cas.model.ReadSessionResult;
+import com.youssefhenna.cas.model.ReadSessionValuesResult;
+import jakarta.annotation.Nullable;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -17,36 +19,19 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CASClientImpl implements CASClient {
-    private final String casAddress;
-    private final String casPort;
-    private final String casKeyHash;
-    private final String casSoftwareKeyHash;
-    private final String casAttestationFlags;
+public class CASClientImpl extends CASClient {
     private final HttpClient httpClient;
     private final ObjectMapper jsonMapper;
 
-
-    public CASClientImpl() {
-        this.casAddress = requireEnv("CAS_ADDRESS");
-        this.casPort = System.getenv("CAS_PORT") != null ? System.getenv("CAS_PORT") : "8081";
-        this.casKeyHash = requireEnv("CAS_KEY_HASH");
-        this.casSoftwareKeyHash = requireEnv("CAS_SOFTWARE_KEY_HASH");
-        this.casAttestationFlags = System.getenv("CAS_ATTESTION_FLAGS");
+    public CASClientImpl(String casAddress, String casPort, String casKeyHash, String casSoftwareKeyHash) {
+        super(casAddress, casPort, casKeyHash, casSoftwareKeyHash);
         this.httpClient = HttpClient.newBuilder()
             .sslContext(trustAllSslContext())
             .build();
         this.jsonMapper = new ObjectMapper();
-
     }
 
-    private static String requireEnv(String name) {
-        String value = System.getenv(name);
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException("Required environment variable not set: " + name);
-        }
-        return value;
-    }
+
 
     // CAS has self-signed cert
     private static SSLContext trustAllSslContext() {
@@ -105,14 +90,19 @@ public class CASClientImpl implements CASClient {
 
 
     @Override
-    public void attestCas() throws IOException, InterruptedException, CASClientException {
+    public ReadSessionValuesResult readSessionValues(String name, String hash) throws IOException, InterruptedException, CASClientException {
+        return this.httpGet("/v1/values/session=" + name + ",session_hash=" + hash, ReadSessionValuesResult.class);
+    }
+
+    @Override
+    public void attestCas(@Nullable String attestationFlags) throws IOException, InterruptedException, CASClientException {
         String[] extraFlags = {};
 
-        if (casAttestationFlags != null) {
-            if (casAttestationFlags.contains("-s") || casAttestationFlags.contains("-c")) {
-                throw new CASClientException(CASExceptionSource.CLI, 1, "Cannot include '-s' or '-c' flags in CAS_ATTESTION_FLAGS");
+        if (attestationFlags != null) {
+            if (attestationFlags.contains("-s") || attestationFlags.contains("-c")) {
+                throw new CASClientException(CASExceptionSource.CLI, 1, "Cannot include '-s' or '-c' flags in attestation flags");
             }
-            extraFlags = casAttestationFlags.split(" ");
+            extraFlags = attestationFlags.split(" ");
         }
 
         List<String> args = new ArrayList<>(List.of(

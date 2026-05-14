@@ -1,21 +1,34 @@
 package com.youssefhenna.cas;
 
-
 import com.youssefhenna.cas.model.ReadSessionResult;
+import com.youssefhenna.cas.model.ReadSessionValuesResult;
+import jakarta.annotation.Nullable;
 
 import java.io.IOException;
 
-public interface CASClient {
+public abstract class CASClient {
+    protected final String casAddress;
+    protected final String casPort;
+    protected final String casKeyHash;
+    protected final String casSoftwareKeyHash;
 
-    ReadSessionResult readSession(String name) throws IOException, InterruptedException, CASClientException;
-    void attestCas() throws IOException, InterruptedException, CASClientException;
+    public CASClient(String casAddress, String casPort, String casKeyHash, String casSoftwareKeyHash) {
+        this.casAddress = casAddress;
+        this.casPort = casPort;
+        this.casKeyHash = casKeyHash;
+        this.casSoftwareKeyHash = casSoftwareKeyHash;
+    }
 
-    enum CASExceptionSource {
+    public abstract ReadSessionResult readSession(String name) throws IOException, InterruptedException, CASClientException;
+    public abstract void attestCas(@Nullable String attestationFlags) throws IOException, InterruptedException, CASClientException;
+    public abstract ReadSessionValuesResult readSessionValues(String name, String hash) throws IOException, InterruptedException, CASClientException;
+
+    public enum CASExceptionSource {
         CLI,
         HTTP,
     }
 
-    class CASClientException extends Exception {
+    public static class CASClientException extends Exception {
         private final int statusCode;
         private final CASExceptionSource exceptionSource;
 
@@ -28,7 +41,8 @@ public interface CASClient {
         public int getStatusCode() {
             return statusCode;
         }
-        public CASExceptionSource getExceptionSource(){
+
+        public CASExceptionSource getExceptionSource() {
             return exceptionSource;
         }
     }
