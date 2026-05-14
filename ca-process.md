@@ -15,6 +15,7 @@ access_policy:
 secrets:
   - name: challenge-private-key
     kind: private-key
+    migrate: false # if private key leaks, update session to regenerate
     export:
       - session: osv-scanner/scanner
 

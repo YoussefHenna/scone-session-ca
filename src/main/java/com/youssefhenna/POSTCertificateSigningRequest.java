@@ -9,7 +9,9 @@ import com.youssefhenna.model.IssueCertificateBody;
 import com.youssefhenna.model.IssueCertificateResponse;
 import com.youssefhenna.model.SessionContents;
 import com.youssefhenna.model.TrustedCASConfig;
+import io.vertx.ext.web.RoutingContext;
 import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -18,41 +20,51 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.time.Instant;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSession;
 
 @Path("/issue-certificate")
-public class CertificateSigningRequest {
+public class POSTCertificateSigningRequest {
+
+    @Inject
+    RoutingContext routingContext;
 
     private TrustedCASConfig trustedCASConfig;
-    private String caCert;
-    private String caPrivateKey;
 
     @PostConstruct
-    void init() throws IOException {
-        String configFile = Utils.requireEnv("TRUSTED_CAS_CONFIG_FILE");
-        trustedCASConfig = new ObjectMapper().readValue(new File(configFile), TrustedCASConfig.class);
-        caCert = Files.readString(java.nio.file.Path.of(Utils.requireEnv("CA_CERT_FILE")));
-        caPrivateKey = Files.readString(java.nio.file.Path.of(Utils.requireEnv("CA_PRIVATE_KEY_FILE")));
+    void init() {
+        try {
+            String configFile = Utils.requireEnv("TRUSTED_CAS_CONFIG_FILE");
+            trustedCASConfig = new ObjectMapper().readValue(new File(configFile), TrustedCASConfig.class);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load trusted CAS config file", e);
+        }
     }
-
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public IssueCertificateResponse issueCertificate(IssueCertificateBody body) {
+        X509Certificate clientCertificate = getClientCertificate();
+
         TrustedCASConfig.TrustedCAS trustedCAS = findTrustedCAS(body.casAddress());
         CASClient casClient = new CASClientImpl(trustedCAS.casAddress(), trustedCAS.casPort(), trustedCAS.casKeyHash(), trustedCAS.casSoftwareKeyHash());
         attestCAS(casClient);
 
         String challengeCertificatePEM = validateChallengeSessionReturningCert(casClient, body.challengeSession(), body.verifySession());
-        //TODO: Verify mTLS connection with this cert, if passes, can issue certificate
+        verifyClientCertMatchesChallenge(clientCertificate, challengeCertificatePEM);
 
-        return null;
+        return CertificateSigner.sign(body.pemEncodedCSR(), trustedCAS, body.verifySession());
     }
-
 
     private TrustedCASConfig.TrustedCAS findTrustedCAS(String casAddress) {
         String[] parts = casAddress.split(":", 2);
@@ -96,10 +108,11 @@ public class CertificateSigningRequest {
                     && s.export().size() == 1
                     && s.export().getFirst().session().equals(verifySession)
                     && s.value() == null
+                    && (s.migrate() == null || s.migrate().equals(Boolean.FALSE))
             )
             .findFirst()
             .orElseThrow(() -> new WebApplicationException(
-                "Challenge session must have a private-key secret exported to exactly the verify session with no explicit value", Response.Status.BAD_REQUEST));
+                "Challenge session must have a non-migratable private-key secret exported to exactly the verify session with no explicit value", Response.Status.BAD_REQUEST));
 
         contents.secrets().stream()
             .filter(s ->
@@ -114,7 +127,6 @@ public class CertificateSigningRequest {
             .findFirst()
             .orElseThrow(() -> new WebApplicationException(
                 "Challenge session must have an x509 secret with export_public=true referencing the private-key secret, no issuer, and no explicit value", Response.Status.BAD_REQUEST));
-
 
         return readChallengeCertificate(casClient, challengeSession, sessionHash);
     }
@@ -140,4 +152,31 @@ public class CertificateSigningRequest {
         }
     }
 
+    private X509Certificate getClientCertificate() {
+        SSLSession sslSession = routingContext.request().sslSession();
+        if (sslSession == null) {
+            throw new WebApplicationException("Connection is not over TLS", Response.Status.FORBIDDEN);
+        }
+        try {
+            Certificate[] certs = sslSession.getPeerCertificates();
+            return (X509Certificate) certs[0];
+        } catch (SSLPeerUnverifiedException e) {
+            throw new WebApplicationException("No client certificate provided", Response.Status.FORBIDDEN);
+        }
+    }
+
+    private void verifyClientCertMatchesChallenge(X509Certificate clientCert, String challengeCertPEM) {
+        X509Certificate challengeCert;
+        try {
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            challengeCert = (X509Certificate) cf.generateCertificate(
+                new ByteArrayInputStream(challengeCertPEM.getBytes(StandardCharsets.UTF_8))
+            );
+        } catch (CertificateException e) {
+            throw new WebApplicationException("Invalid challenge certificate: " + e.getMessage(), Response.Status.BAD_REQUEST);
+        }
+        if (!clientCert.equals(challengeCert)) {
+            throw new WebApplicationException("Client certificate does not match challenge certificate", Response.Status.FORBIDDEN);
+        }
+    }
 }

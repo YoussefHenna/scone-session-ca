@@ -23,7 +23,9 @@ public record SessionContents(String name, ArrayList<SessionSecret> secrets) {
         @Nullable
         String value,
         @Nullable
-        String issuer
+        String issuer,
+        @Nullable
+        Boolean migrate
     ){}
     public record SessionDefinition(String session){}
 
