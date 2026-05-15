@@ -88,6 +88,8 @@ This project uses Quarkus, to learn more about Quarkus, please visit its website
 Set these in the shell when running dev mode, or when running the image.
 - `CA_CERT_FILE`*: Path to the main CA cert file. Used for issuing of certificates. The certificate end clients use to verify an issued cert.
 - `CA_PRIVATE_KEY_FILE`*: Path to the private key file of `CA_CERT_FILE`. Used for signing issued certs
+- `TLS_CERT_FILE`*: Path to the TLS cert file. Used for service->CA communication
+- `TLS_PRIVATE_KEY_FILE`*: Path to the private key file of `TLS_PRIVATE_KEY_FILE`
 - `TRUSTED_CAS_CONFIG_FILE`*: Path to a json config file that specifies trusted CAS's. In the following format
 ```json
 {
