@@ -3,13 +3,13 @@ package com.youssefhenna;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.youssefhenna.cas.CASClient;
-import com.youssefhenna.cas.CASClientImpl;
+import com.youssefhenna.cas.CASClientFactory;
 import com.youssefhenna.cas.model.ReadSessionResult;
+import com.youssefhenna.client_cert.ClientCertificateExtractor;
 import com.youssefhenna.model.IssueCertificateBody;
 import com.youssefhenna.model.IssueCertificateResponse;
 import com.youssefhenna.model.SessionContents;
 import com.youssefhenna.model.TrustedCASConfig;
-import io.vertx.ext.web.RoutingContext;
 import jakarta.annotation.PostConstruct;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
@@ -24,19 +24,19 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
-import javax.net.ssl.SSLPeerUnverifiedException;
-import javax.net.ssl.SSLSession;
 
 @Path("/issue-certificate")
 public class POSTCertificateSigningRequest {
 
     @Inject
-    RoutingContext routingContext;
+    CASClientFactory casClientFactory;
+
+    @Inject
+    ClientCertificateExtractor clientCertificateExtractor;
 
     private TrustedCASConfig trustedCASConfig;
 
@@ -54,10 +54,10 @@ public class POSTCertificateSigningRequest {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public IssueCertificateResponse issueCertificate(IssueCertificateBody body) {
-        X509Certificate clientCertificate = getClientCertificate();
+        X509Certificate clientCertificate = clientCertificateExtractor.extract();
 
         TrustedCASConfig.TrustedCAS trustedCAS = findTrustedCAS(body.casAddress());
-        CASClient casClient = new CASClientImpl(trustedCAS.casAddress(), trustedCAS.casPort(), trustedCAS.casKeyHash(), trustedCAS.casSoftwareKeyHash());
+        CASClient casClient = casClientFactory.create(trustedCAS);
         attestCAS(casClient);
 
         String challengeCertificatePEM = validateChallengeSessionReturningCert(casClient, body.challengeSession(), body.verifySession());
@@ -79,7 +79,7 @@ public class POSTCertificateSigningRequest {
 
     private void attestCAS(CASClient casClient) {
         try {
-            casClient.attestCas(System.getenv("CAS_ATTESTION_FLAGS"));
+            casClient.attestCas(Utils.getEnv("CAS_ATTESTION_FLAGS"));
         } catch (CASClient.CASClientException e) {
             throw new WebApplicationException("CAS attestation failed: " + e.getMessage(), Response.Status.FORBIDDEN);
         } catch (IOException | InterruptedException e) {
@@ -149,19 +149,6 @@ public class POSTCertificateSigningRequest {
             throw new WebApplicationException("Failed to read challenge session values: " + e.getMessage(), Response.Status.BAD_REQUEST);
         } catch (IOException | InterruptedException e) {
             throw new WebApplicationException("Challenge session values read error: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    private X509Certificate getClientCertificate() {
-        SSLSession sslSession = routingContext.request().sslSession();
-        if (sslSession == null) {
-            throw new WebApplicationException("Connection is not over TLS", Response.Status.FORBIDDEN);
-        }
-        try {
-            Certificate[] certs = sslSession.getPeerCertificates();
-            return (X509Certificate) certs[0];
-        } catch (SSLPeerUnverifiedException e) {
-            throw new WebApplicationException("No client certificate provided", Response.Status.FORBIDDEN);
         }
     }
 
