@@ -118,9 +118,9 @@ You can run your application in dev mode that enables live coding using:
 ./mvnw quarkus:dev
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+> **_NOTE:_**  You need to have the `scone` cli available locally for CAS attestation to work.
 
-To run with testing certificates
+To run with testing certs + config
 
 ```shell script
 CA_CERT_FILE=test-certs/ca.crt \
@@ -128,6 +128,7 @@ CA_PRIVATE_KEY_FILE=test-certs/ca.key \
 TLS_CERT_FILE=test-certs/tls.pem \
 TLS_PRIVATE_KEY_FILE=test-certs/tls.key \
 TRUSTED_CAS_CONFIG_FILE=test-certs/trusted-cas-config.json \
+CAS_ATTESTION_FLAGS='--only_for_testing-debug --only_for_testing-ignore-signer --only_for_testing-trust-any -GCS' \
 ./mvnw quarkus:dev
 ```
 
@@ -145,13 +146,32 @@ It produces the `quarkus-run.jar` file in the `target/quarkus-app/` directory. T
 docker build -f src/main/docker/Dockerfile.jvm -t scone-session-ca .
 ```
 
+> **_NOTE:_**  You need to have access to https://gitlab.scontain.com/scone.cloud to be able to build the image
+
 Then run
 ```shell script
-docker run -i --rm -p 8080:8080 scone-session-ca
+docker run -i --rm -p 8443:8443 scone-session-ca
 ```
 
-Also see [other docker options](src/main/docker)
+To run with testing certs + config
+
+```shell script
+docker run -i --rm -p 8443:8443 \
+  -v $(pwd)/test-certs:/test-certs \
+  -e CA_CERT_FILE=/test-certs/ca.crt \
+  -e CA_PRIVATE_KEY_FILE=/test-certs/ca.key \
+  -e TLS_CERT_FILE=/test-certs/tls.pem \
+  -e TLS_PRIVATE_KEY_FILE=/test-certs/tls.key \
+  -e TRUSTED_CAS_CONFIG_FILE=/test-certs/trusted-cas-config.json \
+  -e CAS_ATTESTION_FLAGS='--only_for_testing-debug --only_for_testing-ignore-signer --only_for_testing-trust-any -GCS' \
+  scone-session-ca
+```
+
+
 
 ## Port 
 Quarkus runs https on port 8443 
+
+## Running Confidentially
+TODO, yet to be done. Can only be deployed as a standard service for now. Ideally CA itself runs confidentially and has self-signed cerfticate that proves so. CA root certificate and key can be CAS generated, making the root of trust be based on CAS. 
 
