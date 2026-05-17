@@ -10,6 +10,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +47,7 @@ jobs:
           echo "REPO=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT" 
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -54,3 +56,9 @@ jobs:
           tags: |
             ghcr.io/${{ steps.meta.outputs.REPO }}:${{ steps.meta.outputs.VERSION }}
             ghcr.io/${{ steps.meta.outputs.REPO }}:latest
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign the image
+        run: cosign sign --yes ghcr.io/${{ steps.meta.outputs.REPO }}@${{ steps.build.outputs.digest }}
