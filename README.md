@@ -167,7 +167,10 @@ docker run -i --rm -p 8443:8443 \
   scone-session-ca
 ```
 
-
+Image also available from
+```
+ghcr.io/youssefhenna/scone-session-ca:latest
+```
 
 ## Port 
 Quarkus runs https on port 8443 
