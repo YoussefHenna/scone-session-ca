@@ -54,10 +54,10 @@ public class CertificateSigner {
 
 
     private static final int CERT_EXPIRY_DAYS = 1;
-    private static final X509Certificate CA_CERT;
-    private static final PrivateKey CA_PRIVATE_KEY;
+    private static X509Certificate CA_CERT;
+    private static PrivateKey CA_PRIVATE_KEY;
 
-    static {
+    static void init() {
         try {
             CA_CERT = parseCert(Files.readString(Path.of(Utils.requireEnv("CA_CERT_FILE"))));
             CA_PRIVATE_KEY = parsePrivateKey(Files.readString(Path.of(Utils.requireEnv("CA_PRIVATE_KEY_FILE"))));

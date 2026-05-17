@@ -10,8 +10,11 @@ import com.youssefhenna.model.IssueCertificateBody;
 import com.youssefhenna.model.IssueCertificateResponse;
 import com.youssefhenna.model.SessionContents;
 import com.youssefhenna.model.TrustedCASConfig;
-import jakarta.annotation.PostConstruct;
+import io.quarkus.runtime.StartupEvent;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -29,6 +32,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 
+@ApplicationScoped
 @Path("/issue-certificate")
 public class POSTCertificateSigningRequest {
 
@@ -40,8 +44,9 @@ public class POSTCertificateSigningRequest {
 
     private TrustedCASConfig trustedCASConfig;
 
-    @PostConstruct
-    void init() {
+    // Called by quarkus on startup
+    void onStart(@Observes StartupEvent ev) {
+        CertificateSigner.init();
         try {
             String configFile = Utils.requireEnv("TRUSTED_CAS_CONFIG_FILE");
             trustedCASConfig = new ObjectMapper().readValue(new File(configFile), TrustedCASConfig.class);
@@ -53,7 +58,7 @@ public class POSTCertificateSigningRequest {
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public IssueCertificateResponse issueCertificate(IssueCertificateBody body) {
+    public IssueCertificateResponse issueCertificate(@Valid IssueCertificateBody body) {
         X509Certificate clientCertificate = clientCertificateExtractor.extract();
 
         TrustedCASConfig.TrustedCAS trustedCAS = findTrustedCAS(body.casAddress());

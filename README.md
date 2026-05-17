@@ -86,9 +86,9 @@ This project uses Quarkus, to learn more about Quarkus, please visit its website
 
 ## Environment variables
 Set these in the shell when running dev mode, or when running the image.
-- `CA_CERT_FILE`*: Path to the main CA cert file. Used for issuing of certificates. The certificate end clients use to verify an issued cert.
+- `CA_CERT_FILE`*: Path to the main CA cert file. Used for issuing of certificates. The certificate end clients use to verify an issued cert. Certificate must be generated wit CA capabilities (signing)
 - `CA_PRIVATE_KEY_FILE`*: Path to the private key file of `CA_CERT_FILE`. Used for signing issued certs
-- `TLS_CERT_FILE`*: Path to the TLS cert file. Used for service->CA communication
+- `TLS_CERT_FILE`*: Path to the TLS cert file. Used for service->CA communication. Certificate for 'localhost' for local dev, or to hosted domain.
 - `TLS_PRIVATE_KEY_FILE`*: Path to the private key file of `TLS_PRIVATE_KEY_FILE`
 - `TRUSTED_CAS_CONFIG_FILE`*: Path to a json config file that specifies trusted CAS's. In the following format
 ```json
@@ -106,6 +106,10 @@ Set these in the shell when running dev mode, or when running the image.
 - `CAS_ATTESTION_FLAGS`: Additional flags used in the attestation call. Same flags as used in `scone cas attest <ADDR> <FLAGS>`. Should ideally not be set, but useful for development and testing.
 
 \*  required
+
+## Certificates
+For testing purposes, one may use the certificates [here](./test-certs).
+
 ## Running in dev mode
 
 You can run your application in dev mode that enables live coding using:
@@ -115,6 +119,17 @@ You can run your application in dev mode that enables live coding using:
 ```
 
 > **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+
+To run with testing certificates
+
+```shell script
+CA_CERT_FILE=test-certs/ca.crt \
+CA_PRIVATE_KEY_FILE=test-certs/ca.key \
+TLS_CERT_FILE=test-certs/tls.pem \
+TLS_PRIVATE_KEY_FILE=test-certs/tls.key \
+TRUSTED_CAS_CONFIG_FILE=test-certs/trusted-cas-config.json \
+./mvnw quarkus:dev
+```
 
 ## Building the image
 
@@ -137,4 +152,6 @@ docker run -i --rm -p 8080:8080 scone-session-ca
 
 Also see [other docker options](src/main/docker)
 
+## Port 
+Quarkus runs https on port 8443 
 

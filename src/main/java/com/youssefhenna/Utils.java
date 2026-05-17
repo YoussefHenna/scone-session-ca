@@ -24,6 +24,8 @@ public class Utils {
     }
 
     private static boolean isTestEnvironment() {
-        return System.getProperty("quarkus.test.profile") != null || System.getProperty("quarkus.profile").equals("test");
+        return System.getProperty("quarkus.test.profile") != null
+            || (System.getProperty("quarkus.profile") != null
+            && System.getProperty("quarkus.profile").equals("test"));
     }
 }

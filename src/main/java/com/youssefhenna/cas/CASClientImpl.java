@@ -99,7 +99,7 @@ public class CASClientImpl extends CASClient {
         String[] extraFlags = {};
 
         if (attestationFlags != null) {
-            if (attestationFlags.contains("-s") || attestationFlags.contains("-c")) {
+            if (attestationFlags.contains("-s ") || attestationFlags.contains("-c ")) {
                 throw new CASClientException(CASExceptionSource.CLI, 1, "Cannot include '-s' or '-c' flags in attestation flags");
             }
             extraFlags = attestationFlags.split(" ");
@@ -107,8 +107,8 @@ public class CASClientImpl extends CASClient {
 
         List<String> args = new ArrayList<>(List.of(
             "scone",
-            "attest",
             "cas",
+            "attest",
             casAddress + ":" + casPort,
             "-c",
             casKeyHash,

@@ -1,4 +1,10 @@
 package com.youssefhenna.model;
 
-public record IssueCertificateBody(String casAddress, String challengeSession, String verifySession, String pemEncodedCSR) {
-}
+import jakarta.validation.constraints.NotBlank;
+
+public record IssueCertificateBody(
+    @NotBlank String casAddress,
+    @NotBlank String challengeSession,
+    @NotBlank String verifySession,
+    @NotBlank String pemEncodedCSR
+) {}

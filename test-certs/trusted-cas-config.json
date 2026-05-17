@@ -1,0 +1,10 @@
+{
+  "trustedCasList": [
+    {
+      "casAddress": "scone-cas.cf",
+      "casPort": "8081",
+      "casKeyHash": "3oC3KEcwV1yoGig1KBDBj5wKetBWZZrV9Vso9vRUP7RZ9ZHAPm",
+      "casSoftwareKeyHash": "4fCzcAREFyJWZ5RBFxuy4GvpB2Wsxr6G3C3HuZ8CKcDkmNDQzw"
+    }
+  ]
+}
