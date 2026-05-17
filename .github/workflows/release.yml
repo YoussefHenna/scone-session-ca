@@ -31,6 +31,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Log in to Scontain registry
+        uses: docker/login-action@v3
+        with:
+          registry: registry.scontain.com
+          username: ${{ secrets.SCONTAIN_USERNAME }}
+          password: ${{ secrets.SCONTAIN_TOKEN }}
+
       # extracts version + lowercases repo name
       - name: Extract metadata
         id: meta
