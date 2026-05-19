@@ -10,6 +10,7 @@ import com.youssefhenna.model.IssueCertificateBody;
 import com.youssefhenna.model.IssueCertificateResponse;
 import com.youssefhenna.model.SessionContents;
 import com.youssefhenna.model.TrustedCASConfig;
+import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -59,16 +60,23 @@ public class POSTCertificateSigningRequest {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public IssueCertificateResponse issueCertificate(@Valid IssueCertificateBody body) {
-        X509Certificate clientCertificate = clientCertificateExtractor.extract();
+        try {
+            X509Certificate clientCertificate = clientCertificateExtractor.extract();
 
-        TrustedCASConfig.TrustedCAS trustedCAS = findTrustedCAS(body.casAddress());
-        CASClient casClient = casClientFactory.create(trustedCAS);
-        attestCAS(casClient);
+            TrustedCASConfig.TrustedCAS trustedCAS = findTrustedCAS(body.casAddress());
+            CASClient casClient = casClientFactory.create(trustedCAS);
+            attestCAS(casClient);
 
-        String challengeCertificatePEM = validateChallengeSessionReturningCert(casClient, body.challengeSession(), body.verifySession());
-        verifyClientCertMatchesChallenge(clientCertificate, challengeCertificatePEM);
+            String challengeCertificatePEM = validateChallengeSessionReturningCert(casClient, body.challengeSession(), body.verifySession());
+            verifyClientCertMatchesChallenge(clientCertificate, challengeCertificatePEM);
 
-        return CertificateSigner.sign(body.pemEncodedCSR(), trustedCAS, body.verifySession());
+            IssueCertificateResponse response = CertificateSigner.sign(body.pemEncodedCSR(), trustedCAS, body.verifySession());
+            Log.info("Issued cert for verified session: " + body.verifySession());
+            return response;
+        } catch (Exception e) {
+            Log.error("Issuing of certificate for session '" + body.verifySession() + "' failed for reason: " + e.getMessage());
+            throw e;
+        }
     }
 
     private TrustedCASConfig.TrustedCAS findTrustedCAS(String casAddress) {
