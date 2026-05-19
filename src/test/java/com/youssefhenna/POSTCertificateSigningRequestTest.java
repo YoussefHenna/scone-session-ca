@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.Map;
 
 import static com.youssefhenna.TestUtils.*;
@@ -358,10 +357,8 @@ class POSTCertificateSigningRequestTest {
         MockCASClient client = mockCASClientFactory.getClient();
         client.setReadSession(name -> new ReadSessionResult("hash123", validSessionYaml("/my-verify-session")));
         client.setReadValues((n, h) -> {
-            var value = new ReadSessionValuesResult.SessionValue("private-key", null, "some-value");
-            var list = new ArrayList<ReadSessionValuesResult.SessionValue>();
-            list.add(value);
-            return new ReadSessionValuesResult(list);
+            ReadSessionValuesResult.SessionValue value = new ReadSessionValuesResult.SessionValue("private-key", null, "some-value");
+            return new ReadSessionValuesResult(Map.of("my-cert", value));
         });
 
         given()
@@ -379,10 +376,8 @@ class POSTCertificateSigningRequestTest {
         client.setReadSession(name -> new ReadSessionResult("hash123", validSessionYaml("/my-verify-session")));
         client.setReadValues((n, h) -> {
             String pastExpiry = Instant.now().minus(1, ChronoUnit.HOURS).toString();
-            var value = new ReadSessionValuesResult.SessionValue("x509", pastExpiry, TestCertificateResource.CLIENT_CERT_PEM);
-            var list = new ArrayList<ReadSessionValuesResult.SessionValue>();
-            list.add(value);
-            return new ReadSessionValuesResult(list);
+            ReadSessionValuesResult.SessionValue value = new ReadSessionValuesResult.SessionValue("x509", pastExpiry, TestCertificateResource.CLIENT_CERT_PEM);
+            return new ReadSessionValuesResult(Map.of("my-cert", value));
         });
 
         given()
@@ -401,10 +396,8 @@ class POSTCertificateSigningRequestTest {
         MockCASClient client = mockCASClientFactory.getClient();
         client.setReadSession(name -> new ReadSessionResult("hash123", validSessionYaml("/my-verify-session")));
         client.setReadValues((n, h) -> {
-            var value = new ReadSessionValuesResult.SessionValue("x509", null, differentCertPem);
-            var list = new ArrayList<ReadSessionValuesResult.SessionValue>();
-            list.add(value);
-            return new ReadSessionValuesResult(list);
+            ReadSessionValuesResult.SessionValue value = new ReadSessionValuesResult.SessionValue("x509", null, differentCertPem);
+            return new ReadSessionValuesResult(Map.of("my-cert", value));
         });
 
         given()

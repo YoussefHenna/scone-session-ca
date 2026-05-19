@@ -5,6 +5,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.youssefhenna.cas.CASClient;
 import com.youssefhenna.cas.CASClientFactory;
 import com.youssefhenna.cas.model.ReadSessionResult;
+import com.youssefhenna.cas.model.ReadSessionValuesResult;
 import com.youssefhenna.client_cert.ClientCertificateExtractor;
 import com.youssefhenna.model.IssueCertificateBody;
 import com.youssefhenna.model.IssueCertificateResponse;
@@ -127,7 +128,7 @@ public class POSTCertificateSigningRequest {
             .orElseThrow(() -> new WebApplicationException(
                 "Challenge session must have a non-migratable private-key secret exported to exactly the verify session with no explicit value", Response.Status.BAD_REQUEST));
 
-        contents.secrets().stream()
+        SessionContents.SessionSecret certSecret = contents.secrets().stream()
             .filter(s ->
                 s.kind().equals("x509")
                     && s.exportPublic() != null
@@ -141,23 +142,25 @@ public class POSTCertificateSigningRequest {
             .orElseThrow(() -> new WebApplicationException(
                 "Challenge session must have an x509 secret with export_public=true referencing the private-key secret, no issuer, and no explicit value", Response.Status.BAD_REQUEST));
 
-        return readChallengeCertificate(casClient, challengeSession, sessionHash);
+        return readChallengeCertificate(casClient, certSecret.name(), challengeSession, sessionHash);
     }
 
-    private String readChallengeCertificate(CASClient casClient, String session, String sessionHash) {
+    private String readChallengeCertificate(CASClient casClient, String certSecretName, String session, String sessionHash) {
         try {
-            var result = casClient.readSessionValues(session, sessionHash);
+            ReadSessionValuesResult result = casClient.readSessionValues(session, sessionHash);
+            ReadSessionValuesResult.SessionValue certValue = result.values().get(certSecretName);
 
-            var cert = result.values().stream()
-                .filter(v -> v.kind().equals("x509"))
-                .findFirst()
-                .orElseThrow(() -> new WebApplicationException("No x509 value found in challenge session public values", Response.Status.BAD_REQUEST));
-
-            if (cert.expires() != null && Instant.now().isAfter(Instant.parse(cert.expires()))) {
+            if (certValue == null) {
+                throw new WebApplicationException("No value found for '" + certSecretName + "' in challenge session public values", Response.Status.BAD_REQUEST);
+            }
+            if (!certValue.kind().equals("x509")) {
+                throw new WebApplicationException("Expected x509 kind for '" + certSecretName + "' but got: " + certValue.kind(), Response.Status.BAD_REQUEST);
+            }
+            if (certValue.expires() != null && Instant.now().isAfter(Instant.parse(certValue.expires()))) {
                 throw new WebApplicationException("Challenge certificate has expired", Response.Status.BAD_REQUEST);
             }
 
-            return cert.value();
+            return certValue.value();
         } catch (CASClient.CASClientException e) {
             throw new WebApplicationException("Failed to read challenge session values: " + e.getMessage(), Response.Status.BAD_REQUEST);
         } catch (IOException | InterruptedException e) {

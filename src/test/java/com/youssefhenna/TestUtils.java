@@ -18,7 +18,6 @@ import java.security.KeyPairGenerator;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.Map;
 
@@ -73,10 +72,8 @@ public class TestUtils {
     }
 
     public static ReadSessionValuesResult valuesWithClientCert() {
-        var value = new ReadSessionValuesResult.SessionValue("x509", null, TestCertificateResource.CLIENT_CERT_PEM);
-        var list = new ArrayList<ReadSessionValuesResult.SessionValue>();
-        list.add(value);
-        return new ReadSessionValuesResult(list);
+        ReadSessionValuesResult.SessionValue value = new ReadSessionValuesResult.SessionValue("x509", null, TestCertificateResource.CLIENT_CERT_PEM);
+        return new ReadSessionValuesResult(Map.of("my-cert", value));
     }
 
     public static Map<String, Object> requestBody(String csrPem) {
