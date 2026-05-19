@@ -34,8 +34,6 @@ secrets:
     kind: x509
     private_key: challenge-private-key
     export_public: true
-    export:
-      - session: <VERIFY_SESSION_NAME>
 ```
 
 ### Step 2
