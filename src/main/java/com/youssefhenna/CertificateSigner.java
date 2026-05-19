@@ -53,7 +53,7 @@ public class CertificateSigner {
     private static final ASN1ObjectIdentifier VERIFIED_SESSION_OID = new ASN1ObjectIdentifier("1.3.6.1.4.1.99999.4");
 
 
-    private static final int CERT_EXPIRY_DAYS = 1;
+    private static final int CERT_EXPIRY_DAYS = 90;
     private static X509Certificate CA_CERT;
     private static PrivateKey CA_PRIVATE_KEY;
 
