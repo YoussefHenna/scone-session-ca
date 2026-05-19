@@ -85,7 +85,7 @@ public class CASClientImpl extends CASClient {
 
     @Override
     public ReadSessionResult readSession(String name) throws IOException, InterruptedException, CASClientException {
-        return this.httpGet("/v1/sessions" + name, ReadSessionResult.class);
+        return this.httpGet("/v1/sessions/" + name, ReadSessionResult.class);
     }
 
 
