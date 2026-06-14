@@ -1,0 +1,10 @@
+{
+  "staticChallengeSessions": [
+    {
+      "casAddress": "scone-cas.cf",
+      "casPort": "8081",
+      "challengeSession": "<CHALLENGE_SESSION_NAME>",
+      "verifySession": "<VERIFY_SESSION_NAME>"
+    }
+  ]
+}

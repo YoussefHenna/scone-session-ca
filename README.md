@@ -101,9 +101,27 @@ Set these in the shell when running dev mode, or when running the image.
   ]
 }
 ```
+- `STATIC_CHALLENGE_SESSIONS_CONFIG_FILE`: Path to a json config file that specifies a limited set of pre-created challenge sessions that the CA allows for verification. 
+```json
+{
+  "staticChallengeSessions": [
+    {
+      "casAddress":"<CAS_ADDRESS>",
+      "casPort":"<CAS_PORT>",
+      "challengeSession": "<CHALLENGE_SESSION_NAME>",
+      "verifySession": "<VERIFY_SESSION_NAME>"
+    }
+  ]
+}
+```
 - `CAS_ATTESTION_FLAGS`: Additional flags used in the attestation call. Same flags as used in `scone cas attest <ADDR> <FLAGS>`. Should ideally not be set, but useful for development and testing.
 
 \*  required
+
+## Static Challenges
+Using the `STATIC_CHALLENGE_SESSIONS_CONFIG_FILE` environment variable, one can set a limited set of challenge sessions that can be used by the CA for verification. This allows for a targeted CA deployment that can be responsible for verification of a specific service. 
+
+Using a non-limited CA deployment means the CA can verify any session, which adds the extra step on the consumer of the certificate to verify the session is the correct one that is expected. With a static set of challenge sessions in a deployed CA, a consumer can trust a service solely based on the certificate, knowing that the CA would only verify the known and previously established sessions. Eliminating the extra step on the consumer to check the verified session, a certificate that chains to the CA would be sufficient for trust.
 
 ## Certificates
 For testing purposes, one may use the certificates [here](./test-certs).

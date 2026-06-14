@@ -7,21 +7,15 @@ import com.youssefhenna.cas.CASClientFactory;
 import com.youssefhenna.cas.model.ReadSessionResult;
 import com.youssefhenna.cas.model.ReadSessionValuesResult;
 import com.youssefhenna.client_cert.ClientCertificateExtractor;
-import com.youssefhenna.model.IssueCertificateBody;
-import com.youssefhenna.model.IssueCertificateResponse;
-import com.youssefhenna.model.SessionContents;
-import com.youssefhenna.model.TrustedCASConfig;
+import com.youssefhenna.model.*;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
+import jakarta.annotation.Nullable;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
@@ -46,14 +40,26 @@ public class POSTCertificateSigningRequest {
 
     private TrustedCASConfig trustedCASConfig;
 
+    @Nullable
+    private StaticChallengeSessionsConfig staticChallengeSessionsConfig;
+
     // Called by quarkus on startup
     void onStart(@Observes StartupEvent ev) {
         CertificateSigner.init();
         try {
-            String configFile = Utils.requireEnv("TRUSTED_CAS_CONFIG_FILE");
-            trustedCASConfig = new ObjectMapper().readValue(new File(configFile), TrustedCASConfig.class);
+            String trustedCasConfigFile = Utils.requireEnv("TRUSTED_CAS_CONFIG_FILE");
+            trustedCASConfig = new ObjectMapper().readValue(new File(trustedCasConfigFile), TrustedCASConfig.class);
         } catch (IOException e) {
             throw new RuntimeException("Failed to load trusted CAS config file", e);
+        }
+
+        try {
+            String staticChallengeSessionConfigFile = Utils.getEnv("STATIC_CHALLENGE_SESSIONS_CONFIG_FILE");
+            if (staticChallengeSessionConfigFile != null) {
+                staticChallengeSessionsConfig = new ObjectMapper().readValue(new File(staticChallengeSessionConfigFile), StaticChallengeSessionsConfig.class);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load trusted static challenge sessions config file", e);
         }
     }
 
@@ -62,6 +68,8 @@ public class POSTCertificateSigningRequest {
     @Produces(MediaType.APPLICATION_JSON)
     public IssueCertificateResponse issueCertificate(@Valid IssueCertificateBody body) {
         try {
+            checkIsChallengeSessionAllowed(body);
+
             X509Certificate clientCertificate = clientCertificateExtractor.extract();
 
             TrustedCASConfig.TrustedCAS trustedCAS = findTrustedCAS(body.casAddress());
@@ -80,15 +88,46 @@ public class POSTCertificateSigningRequest {
         }
     }
 
-    private TrustedCASConfig.TrustedCAS findTrustedCAS(String casAddress) {
-        String[] parts = casAddress.split(":", 2);
+    private void checkIsChallengeSessionAllowed(IssueCertificateBody body) {
+        if (staticChallengeSessionsConfig == null) {
+            // no static challenges config, all allowed
+            return;
+        }
+
+        String[] parts = extractAddressAndPort(body.casAddress());
         String host = parts[0];
-        String port = parts.length > 1 ? parts[1] : null;
+        String port = parts[1];
+
+        boolean isInStaticChallengeSessions = staticChallengeSessionsConfig.staticChallengeSessions().stream().anyMatch(staticChallengeSession ->
+            staticChallengeSession.casAddress().equals(host)
+                && staticChallengeSession.casPort().equals(port)
+                && staticChallengeSession.verifySession().equals(body.verifySession())
+                && staticChallengeSession.challengeSession().equals(body.challengeSession()
+            )
+        );
+
+        if(!isInStaticChallengeSessions){
+            throw new WebApplicationException("Provided sessions and/or CAS combination are not allowed verification.", Response.Status.FORBIDDEN);
+        }
+    }
+
+    private TrustedCASConfig.TrustedCAS findTrustedCAS(String casAddress) {
+        String[] parts = extractAddressAndPort(casAddress);
+        String host = parts[0];
+        String port = parts[1];
 
         return trustedCASConfig.trustedCasList().stream()
-            .filter(cas -> cas.casAddress().equals(host) && (port == null || cas.casPort().equals(port)))
+            .filter(cas -> cas.casAddress().equals(host) && cas.casPort().equals(port))
             .findFirst()
-            .orElseThrow(() -> new WebApplicationException("CAS address not known: " + casAddress, Response.Status.FORBIDDEN));
+            .orElseThrow(() -> new WebApplicationException("CAS address not known or trusted: " + casAddress, Response.Status.FORBIDDEN));
+    }
+
+    private String[] extractAddressAndPort(String casAddress) {
+        String[] parts = casAddress.split(":", 2);
+        String host = parts[0];
+        String port = parts.length > 1 ? parts[1] : "8081";
+
+        return new String[]{host, port};
     }
 
     private void attestCAS(CASClient casClient) {
