@@ -123,9 +123,10 @@ public class POSTCertificateSigningRequest {
     }
 
     private String[] extractAddressAndPort(String casAddress) {
+        String defaultCASPort = "8081";
         String[] parts = casAddress.split(":", 2);
         String host = parts[0];
-        String port = parts.length > 1 ? parts[1] : "8081";
+        String port = parts.length > 1 ? parts[1] : defaultCASPort;
 
         return new String[]{host, port};
     }
