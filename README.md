@@ -29,6 +29,7 @@ secrets:
     migrate: false # can ommit, default is false
     export:
       - session: <VERIFY_SESSION_NAME>
+        session_hash: <VERIFY_SESSION_HASH> # optional, pins verification to specific hash
 
   - name: challenge-cert
     kind: x509
@@ -46,9 +47,11 @@ Service that is running confidentially under the previously selected SCONE sessi
   "casAddress": "<CAS_ADDRESS>",
   "challengeSession": " <CA_CHALLENGE_SESSION_NAME>",
   "verifySession":"<VERIFY_SESSION_NAME>",
+  "verifySessionHash": "<VERIFY_SESSION_HASH>",
   "pemEncodedCSR": "<PEM_ENCODED_CERTIFICATE_SIGNING_REQUEST>"
 }
 ```
+`verifySessionHash` is optional. It must be provided iff the challenge session's private-key export pins a `session_hash`.
 
 ### Step 3
 CA issues signed certificate if the following conditions are met:
@@ -68,6 +71,7 @@ At that stage, the CA provides a response in the following format
 ### Step 4
 Service can use signed certificate to prove it is running confidentially under a given session under a specific CAS. The certificate is bounded and includes the following proven fields:
 - Verified session name
+- Verified session hash (only when the challenge session pins a `session_hash`)
 - CAS address where verification was confirmed
 - CAS Key Hash where verification was confirmed
 - CAS Software Key Hash where verification was confirmed
@@ -121,7 +125,7 @@ Set these in the shell when running dev mode, or when running the image.
 ## Static Challenges
 Using the `STATIC_CHALLENGE_SESSIONS_CONFIG_FILE` environment variable, one can set a limited set of challenge sessions that can be used by the CA for verification. This allows for a targeted CA deployment that can be responsible for verification of a specific service. 
 
-Using a non-limited CA deployment means the CA can verify any session, which adds the extra step on the consumer of the certificate to verify the session is the correct one that is expected. With a static set of challenge sessions in a deployed CA, a consumer can trust a service solely based on the certificate, knowing that the CA would only verify the known and previously established sessions. Eliminating the extra step on the consumer to check the verified session, a certificate that chains to the CA would be sufficient for trust.
+Using a non-limited CA deployment means the CA can verify any session, which adds the extra step on the consumer of the certificate to verify the session is the correct one that is expected. With a static set of challenge sessions in a deployed CA, a consumer can trust a service solely based on the certificate, knowing that the CA would only verify the known and previously established sessions. Eliminating the extra step on the consumer     to check the verified session, a certificate that chains to the CA would be sufficient for trust.
 
 ## Certificates
 For testing purposes, one may use the certificates [here](./test-certs).

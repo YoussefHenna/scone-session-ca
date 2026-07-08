@@ -20,10 +20,14 @@ import java.util.Map;
 import static com.youssefhenna.TestUtils.*;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 @QuarkusTest
 @QuarkusTestResource(TestCertificateResource.class)
 class POSTCertificateSigningRequestTest {
+
+    private static final String VERIFIED_SESSION_HASH_OID = "1.3.6.1.4.1.99999.5";
 
     @Inject
     MockCASClientFactory mockCASClientFactory;
@@ -383,6 +387,85 @@ class POSTCertificateSigningRequestTest {
         given()
             .contentType(ContentType.JSON)
             .body(requestBody(csrPem))
+            .when().post("/issue-certificate")
+            .then()
+            .statusCode(400);
+    }
+
+    @Test
+    void should_embedSessionHashExtension_when_verifySessionHashMatchesPinnedHash() throws Exception {
+        String csrPem = generateCSR();
+        String sessionHash = "verify-session-hash-abc";
+        MockCASClient client = mockCASClientFactory.getClient();
+        client.setReadSession(name -> new ReadSessionResult("hash123", validSessionYamlWithHash("/my-verify-session", sessionHash)));
+        client.setReadValues((n, h) -> valuesWithClientCert());
+
+        String pem = given()
+            .contentType(ContentType.JSON)
+            .body(requestBody(csrPem, sessionHash))
+            .when().post("/issue-certificate")
+            .then()
+            .statusCode(200)
+            .extract().path("pemEncodedCertificate");
+
+        assertEquals(sessionHash, certExtensionValue(pem, VERIFIED_SESSION_HASH_OID));
+    }
+
+    @Test
+    void should_notEmbedSessionHashExtension_when_challengeDoesNotPinSessionHash() throws Exception {
+        String csrPem = generateCSR();
+        MockCASClient client = mockCASClientFactory.getClient();
+        client.setReadSession(name -> new ReadSessionResult("hash123", validSessionYaml("/my-verify-session")));
+        client.setReadValues((n, h) -> valuesWithClientCert());
+
+        String pem = given()
+            .contentType(ContentType.JSON)
+            .body(requestBody(csrPem))
+            .when().post("/issue-certificate")
+            .then()
+            .statusCode(200)
+            .extract().path("pemEncodedCertificate");
+
+        assertNull(certExtensionValue(pem, VERIFIED_SESSION_HASH_OID));
+    }
+
+    @Test
+    void should_return400_when_challengePinsSessionHashButRequestOmitsIt() throws Exception {
+        String csrPem = generateCSR();
+        MockCASClient client = mockCASClientFactory.getClient();
+        client.setReadSession(name -> new ReadSessionResult("hash123", validSessionYamlWithHash("/my-verify-session", "pinned-hash")));
+
+        given()
+            .contentType(ContentType.JSON)
+            .body(requestBody(csrPem))
+            .when().post("/issue-certificate")
+            .then()
+            .statusCode(400);
+    }
+
+    @Test
+    void should_return400_when_verifySessionHashDoesNotMatchPinnedHash() throws Exception {
+        String csrPem = generateCSR();
+        MockCASClient client = mockCASClientFactory.getClient();
+        client.setReadSession(name -> new ReadSessionResult("hash123", validSessionYamlWithHash("/my-verify-session", "pinned-hash")));
+
+        given()
+            .contentType(ContentType.JSON)
+            .body(requestBody(csrPem, "different-hash"))
+            .when().post("/issue-certificate")
+            .then()
+            .statusCode(400);
+    }
+
+    @Test
+    void should_return400_when_verifySessionHashProvidedButChallengeDoesNotPin() throws Exception {
+        String csrPem = generateCSR();
+        MockCASClient client = mockCASClientFactory.getClient();
+        client.setReadSession(name -> new ReadSessionResult("hash123", validSessionYaml("/my-verify-session")));
+
+        given()
+            .contentType(ContentType.JSON)
+            .body(requestBody(csrPem, "some-hash"))
             .when().post("/issue-certificate")
             .then()
             .statusCode(400);

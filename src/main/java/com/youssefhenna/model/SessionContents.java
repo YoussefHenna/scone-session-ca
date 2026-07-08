@@ -27,6 +27,11 @@ public record SessionContents(String name, ArrayList<SessionSecret> secrets) {
         @Nullable
         Boolean migrate
     ){}
-    public record SessionDefinition(String session){}
+    public record SessionDefinition(
+        String session,
+        @JsonProperty("session_hash")
+        @Nullable
+        String sessionHash
+    ){}
 
 }

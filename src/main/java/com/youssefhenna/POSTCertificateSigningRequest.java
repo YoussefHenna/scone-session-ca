@@ -76,10 +76,10 @@ public class POSTCertificateSigningRequest {
             CASClient casClient = casClientFactory.create(trustedCAS);
             attestCAS(casClient);
 
-            String challengeCertificatePEM = validateChallengeSessionReturningCert(casClient, body.challengeSession(), body.verifySession());
+            String challengeCertificatePEM = validateChallengeSessionReturningCert(casClient, body.challengeSession(), body.verifySession(), body.verifySessionHash());
             verifyClientCertMatchesChallenge(clientCertificate, challengeCertificatePEM);
 
-            IssueCertificateResponse response = CertificateSigner.sign(body.pemEncodedCSR(), trustedCAS, body.verifySession());
+            IssueCertificateResponse response = CertificateSigner.sign(body.pemEncodedCSR(), trustedCAS, body.verifySession(), body.verifySessionHash());
             Log.info("Issued cert for verified session: " + body.verifySession());
             return response;
         } catch (Exception e) {
@@ -106,7 +106,7 @@ public class POSTCertificateSigningRequest {
             )
         );
 
-        if(!isInStaticChallengeSessions){
+        if (!isInStaticChallengeSessions) {
             throw new WebApplicationException("Provided sessions and/or CAS combination are not allowed verification.", Response.Status.FORBIDDEN);
         }
     }
@@ -141,7 +141,7 @@ public class POSTCertificateSigningRequest {
         }
     }
 
-    private String validateChallengeSessionReturningCert(CASClient casClient, String challengeSession, String verifySession) {
+    private String validateChallengeSessionReturningCert(CASClient casClient, String challengeSession, String verifySession, String verifySessionHash) {
         SessionContents contents;
         String sessionHash;
         try {
@@ -168,6 +168,8 @@ public class POSTCertificateSigningRequest {
             .orElseThrow(() -> new WebApplicationException(
                 "Challenge session must have a non-migratable private-key secret exported to exactly the verify session with no explicit value", Response.Status.BAD_REQUEST));
 
+        validateVerifySessionHash(privateKeySecret.export().getFirst(), verifySessionHash);
+
         SessionContents.SessionSecret certSecret = contents.secrets().stream()
             .filter(s ->
                 s.kind().equals("x509")
@@ -183,6 +185,28 @@ public class POSTCertificateSigningRequest {
                 "Challenge session must have an x509 secret with export_public=true referencing the private-key secret, no issuer, and no explicit value", Response.Status.BAD_REQUEST));
 
         return readChallengeCertificate(casClient, certSecret.name(), challengeSession, sessionHash);
+    }
+
+
+    private void validateVerifySessionHash(SessionContents.SessionDefinition export, String verifySessionHash) {
+        String pinnedHash = export.sessionHash();
+
+        if (pinnedHash == null) {
+            if (verifySessionHash != null) {
+                throw new WebApplicationException(
+                    "verifySessionHash was provided but the challenge session does not pin a session hash", Response.Status.BAD_REQUEST);
+            }
+            return;
+        }
+
+        if (verifySessionHash == null) {
+            throw new WebApplicationException(
+                "Challenge session pins a session hash, verifySessionHash must be provided", Response.Status.BAD_REQUEST);
+        }
+        if (!pinnedHash.equals(verifySessionHash)) {
+            throw new WebApplicationException(
+                "Provided verifySessionHash does not match the session hash pinned by the challenge session", Response.Status.BAD_REQUEST);
+        }
     }
 
     private String readChallengeCertificate(CASClient casClient, String certSecretName, String session, String sessionHash) {

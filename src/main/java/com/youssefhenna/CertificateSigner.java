@@ -4,6 +4,7 @@ import com.youssefhenna.model.IssueCertificateResponse;
 import com.youssefhenna.model.TrustedCASConfig;
 import io.quarkus.arc.log.LoggerName;
 import io.quarkus.logging.Log;
+import jakarta.annotation.Nullable;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -51,6 +52,7 @@ public class CertificateSigner {
     private static final ASN1ObjectIdentifier CAS_KEY_HASH_OID = new ASN1ObjectIdentifier("1.3.6.1.4.1.99999.2");
     private static final ASN1ObjectIdentifier CAS_SW_KEY_HASH_OID = new ASN1ObjectIdentifier("1.3.6.1.4.1.99999.3");
     private static final ASN1ObjectIdentifier VERIFIED_SESSION_OID = new ASN1ObjectIdentifier("1.3.6.1.4.1.99999.4");
+    private static final ASN1ObjectIdentifier VERIFIED_SESSION_HASH_OID = new ASN1ObjectIdentifier("1.3.6.1.4.1.99999.5");
 
 
     private static final int CERT_EXPIRY_DAYS = 90;
@@ -73,7 +75,8 @@ public class CertificateSigner {
     public static IssueCertificateResponse sign(
         String pemEncodedCSR,
         TrustedCASConfig.TrustedCAS trustedCAS,
-        String verifySession
+        String verifySession,
+        @Nullable String verifySessionHash
     ) {
         PKCS10CertificationRequest csr = parseCsr(pemEncodedCSR);
         verifyCsrSignature(csr);
@@ -99,6 +102,9 @@ public class CertificateSigner {
             certBuilder.addExtension(CAS_KEY_HASH_OID, false, new DERUTF8String(trustedCAS.casKeyHash()));
             certBuilder.addExtension(CAS_SW_KEY_HASH_OID, false, new DERUTF8String(trustedCAS.casSoftwareKeyHash()));
             certBuilder.addExtension(VERIFIED_SESSION_OID, false, new DERUTF8String(verifySession));
+            if (verifySessionHash != null) {
+                certBuilder.addExtension(VERIFIED_SESSION_HASH_OID, false, new DERUTF8String(verifySessionHash));
+            }
 
             // enforce issued cert only used for TLS
             certBuilder.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature));
